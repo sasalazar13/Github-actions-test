@@ -46,7 +46,7 @@ describe('API - Health', () => {
 describe('API - Mensajes', () => {
   test('GET /api/messages retorna lista de mensajes', async () => {
     const res = await request(app).get('/api/messages');
-    expect(res.statusCode).toBe(999);
+    expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.messages)).toBe(true);
   });
