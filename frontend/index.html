@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Tablero de Mensajes</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d0d0d; color: #f0f0f0; font-family: sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px 80px; }
+    h1 { font-size: 32px; font-weight: 800; margin-bottom: 32px; }
+    .compose { width: 100%; max-width: 720px; background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 20px; margin-bottom: 24px; display: flex; gap: 12px; }
+    input { background: #0d0d0d; border: 1px solid #2a2a2a; border-radius: 8px; color: #f0f0f0; font-size: 14px; padding: 10px 14px; outline: none; }
+    input:focus { border-color: #47c8ff; }
+    input::placeholder { color: #666; }
+    #author-input { width: 180px; flex-shrink: 0; }
+    #text-input { flex: 1; }
+    button { background: #e8ff47; color: #000; border: none; border-radius: 8px; padding: 10px 20px; font-weight: 700; font-size: 14px; cursor: pointer; }
+    button:hover { opacity: 0.85; }
+    #message-list { width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 10px; }
+    .msg-card { background: #161616; border: 1px solid #2a2a2a; border-radius: 10px; padding: 16px 18px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .msg-body { flex: 1; }
+    .msg-author { font-size: 13px; font-weight: 600; color: #47c8ff; margin-bottom: 4px; }
+    .msg-time { font-size: 11px; color: #666; margin-left: 10px; }
+    .msg-text { font-size: 14px; line-height: 1.5; }
+    .delete-btn { background: none; border: none; color: #666; cursor: pointer; font-size: 14px; padding: 2px 6px; }
+    .delete-btn:hover { color: #ff5555; }
+    #empty-state { color: #666; font-size: 13px; padding: 40px; display: none; }
+    #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px); background: #161616; border: 1px solid #2a2a2a; color: #f0f0f0; font-size: 13px; padding: 10px 18px; border-radius: 8px; transition: transform 0.3s ease; z-index: 100; }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <h1>Tablero de Mensajes</h1>
+  <div class="compose">
+    <input id="author-input" type="text" placeholder="Tu nombre" maxlength="30"/>
+    <input id="text-input" type="text" placeholder="Escribe un mensaje..." maxlength="200"/>
+    <button onclick="sendMessage()">Enviar</button>
+  </div>
+  <div id="message-list"></div>
+  <div id="empty-state">Sin mensajes</div>
+  <div id="toast"></div>
+  <script>
+    const API_URL = '/api';
+    async function loadMessages() {
+      try {
+        const res = await fetch(`${API_URL}/messages`);
+        const data = await res.json();
+        renderMessages(data.messages);
+      } catch { showToast('No se pudo contactar la API'); }
+    }
+    function renderMessages(messages) {
+      const list = document.getElementById('message-list');
+      const empty = document.getElementById('empty-state');
+      if (messages.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+      empty.style.display = 'none';
+      list.innerHTML = messages.slice().reverse().map(m => `
+        <div class="msg-card" id="msg-${m.id}">
+          <div class="msg-body">
+            <div><span class="msg-author">${escapeHtml(m.author)}</span><span class="msg-time">${formatTime(m.timestamp)}</span></div>
+            <div class="msg-text">${escapeHtml(m.text)}</div>
+          </div>
+          <button class="delete-btn" onclick="deleteMessage(${m.id})">x</button>
+        </div>`).join('');
+    }
+    async function sendMessage() {
+      const author = document.getElementById('author-input').value.trim();
+      const text = document.getElementById('text-input').value.trim();
+      if (!author || !text) { showToast('Completa ambos campos'); return; }
+      try {
+        const res = await fetch(`${API_URL}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ author, text }) });
+        if (res.ok) { document.getElementById('text-input').value = ''; await loadMessages(); }
+      } catch { showToast('Error al enviar'); }
+    }
+    async function deleteMessage(id) {
+      try { await fetch(`${API_URL}/messages/${id}`, { method: 'DELETE' }); await loadMessages(); }
+      catch { showToast('Error al eliminar'); }
+    }
+    document.getElementById('text-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+    function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function formatTime(iso) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+    function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
+    loadMessages();
+    setInterval(loadMessages, 5000);
+  </script>
+</body>
+</html>
